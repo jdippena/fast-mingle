@@ -1,0 +1,1 @@
+/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc   -Wl,-search_paths_first -Wl,-headerpad_max_install_names  CMakeFiles/pngtest.dir/pngtest.c.o  -o pngtest  libpng16.16.23.0.dylib /usr/lib/libz.dylib /usr/lib/libm.dylib -Wl,-rpath,/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23 

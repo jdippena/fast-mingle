@@ -1,0 +1,42 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/png.h
+pnglibconf.h
+/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/pnglibconf.h
+pngconf.h
+/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/pngconf.h
+
+/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/pngconf.h
+limits.h
+-
+stddef.h
+-
+stdio.h
+-
+setjmp.h
+-
+time.h
+-
+
+/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/pnglibconf.h
+
+/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/pngtest.c
+stdio.h
+-
+stdlib.h
+-
+string.h
+-
+png.h
+/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/png.h
+zlib.h
+/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/zlib.h
+time.h
+-
+

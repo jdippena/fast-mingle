@@ -1,0 +1,11 @@
+prefix=/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23
+exec_prefix=/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23
+libdir=/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/lib
+includedir=/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/include/libpng16
+
+Name: libpng
+Description: Loads and saves PNG files
+Version: 1.6.23
+Libs: -L${libdir} -lpng16
+Libs.private: -lz -lm
+Cflags: -I${includedir}

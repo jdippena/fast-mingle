@@ -1,0 +1,1 @@
+/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc   -Wl,-search_paths_first -Wl,-headerpad_max_install_names  CMakeFiles/png-fix-itxt.dir/contrib/tools/png-fix-itxt.c.o  -o png-fix-itxt  /usr/lib/libz.dylib /usr/lib/libm.dylib 

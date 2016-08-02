@@ -1,0 +1,14 @@
+/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/CMakeFiles/pngfix.dir
+/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/CMakeFiles/pngstest.dir
+/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/CMakeFiles/pngvalid.dir
+/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/CMakeFiles/pngunknown.dir
+/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/CMakeFiles/png_static.dir
+/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/CMakeFiles/pngtest.dir
+/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/CMakeFiles/png.dir
+/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/CMakeFiles/genfiles.dir
+/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/CMakeFiles/genprebuilt.dir
+/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/CMakeFiles/gensym.dir
+/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/CMakeFiles/genvers.dir
+/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/CMakeFiles/png-fix-itxt.dir
+/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/CMakeFiles/pngimage.dir
+/Users/Jaco/Documents/Research/MingleC/libpng-1.6.23/CMakeFiles/symbol-check.dir
