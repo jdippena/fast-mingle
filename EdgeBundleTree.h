@@ -7,6 +7,52 @@
 #include <cassert>
 #include "Util.h"
 
+
+
+
+class BaseNode {
+public:
+    Point* getS() { return _s; };
+    Point* getT() { return _t; };
+    BundleNode* getBundle() { return _b; }
+    virtual Point *getSCentroid() = 0;
+    virtual Point *getTCentroid() = 0;
+    virtual std::vector<BundleNode *> *getChildren() = 0;
+    double getInk() { return _s->sqDist(*_t); }
+    void setBundle(BundleNode *b) {
+        _b = b;
+        for (auto child : *getChildren()) {
+          child->setBundle(b);
+        }
+    }
+protected:
+    Point *_s = nullptr;
+    Point *_t = nullptr;
+    BundleNode *_b = nullptr;
+};
+
+class BundleNode : public BaseNode {
+    Point* getSCentroid() { return &_sCentroid; };
+    Point* getTCentroid() { return &_tCentroid; };
+    std::vector<BundleNode *> *getChildren() { return &_children; }
+private:
+    Point _sCentroid;
+    Point _tCentroid;
+    std::vector<BundleNode *>_children = nullptr;
+};
+
+
+class EdgeNode : public BaseNode {
+public:
+    Point* getSCentroid() { return _s; };
+    Point* getTCentroid() { return _t; };
+    std::vector<BundleNode *> *getChildren() { return &NO_POINTS; }
+private:
+    static std::vector<BundleNode *> NO_POINTS;
+};
+
+
+
 class EdgeBundleTree {
 
 public:

@@ -23,6 +23,10 @@ public:
     void write(char *path);
 
 private:
+    // Members needed for the ANN search
+    ANNpointArray   annPoints;
+    ANNkd_tree      annTree;
+
     EdgeBundleTree::Edge *edges;
     unsigned int numEdges;
     unsigned int numNeighbors;
