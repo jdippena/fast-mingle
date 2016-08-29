@@ -137,10 +137,11 @@ void EdgeBundler::doMingle() {
                     }
                 }
                 if (maxInkSaved > 0) {
-                    EdgeBundleTree::applyBundle(bundleReturnArray[maxSavingNeighborIndex],
+                    int weight = EdgeBundleTree::applyBundle(bundleReturnArray[maxSavingNeighborIndex],
                                                 edge,
                                                 *edge.neighbors[maxSavingNeighborIndex]);
                     numBundled++;
+                    maxWeight = weight > maxWeight ? weight : maxWeight;
                 }
             }
         }

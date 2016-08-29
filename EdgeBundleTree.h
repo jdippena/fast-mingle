@@ -37,7 +37,7 @@ public:
     EdgeBundleTree(Edge *edges, unsigned int numEdges);
 
     static void testBundle(EdgeBundleTree::BundleReturn *bundleReturn, const Edge &bundle1, const Edge &bundle2);
-    static void applyBundle(const BundleReturn& bundleReturn, Edge& edge1, Edge& edge2);
+    static int applyBundle(const BundleReturn& bundleReturn, Edge& edge1, Edge& edge2);
     void coalesceTree();
 
 private:

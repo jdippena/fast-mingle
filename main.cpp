@@ -3,6 +3,7 @@
 using namespace std;
 
 EdgeBundler *bundler;
+int debug = 0;
 
 const int WIDTH = 2000;
 const int HEIGHT = 1000;
@@ -22,14 +23,17 @@ inline double normalizeY(double y) {
     return (y - bundler->center.y) / bundler->height * ZOOM_CONST;
 }
 
+void setGlColor(int weight, float alpha) {
+    float x = bundler->maxWeight == 1 ? 0 : (float) (weight - 1) / (float) (bundler->maxWeight - 1);
+    glColor4f(0.2f + 0.8f*x, 0.8f - 0.8f*x, 0.2f - 0.2f*x, alpha);
+}
+
 void drawPoint(const Point *p) {
     glPointSize(10);
-    glColor3f(0, 0, 0);
+    glColor3f(0, 1, 0);
     glBegin(GL_POINTS);
         glVertex2d(normalizeX(p->x), normalizeY(p->y));
     glEnd();
-    printf("\nx: %lf\n", normalizeX(p->x));
-    printf("y: %lf\n", normalizeY(p->y));
 }
 
 void drawLine(const Point *p1, const Point *p2, const int weight) {
@@ -37,8 +41,9 @@ void drawLine(const Point *p1, const Point *p2, const int weight) {
     if (w < 1) w = 1;
     float alpha = weight / 5.0f;
     if (alpha > 1.0) alpha = 1.0f;
-    glLineWidth(w);
-    glColor4f(0.5f, 0.5f, 1.0f, alpha);
+//    glLineWidth(w);
+//    glColor4f(0.2f, 0.8f, 0.2f, alpha);
+    setGlColor(weight, alpha);
     glBegin(GL_LINES);
         glVertex2d(normalizeX(p1->x), normalizeY(p1->y));
         glVertex2d(normalizeX(p2->x), normalizeY(p2->y));
@@ -52,10 +57,11 @@ void drawBezier(const Point *start, const Point *ctrl1, const Point *ctrl2, cons
                                     {normalizeX(end->x), normalizeY(end->y)}};
     float alpha = weight / 5.0f;
     if (alpha > 1.0) alpha = 1.0f;
-    glColor4f(0.5f, 0.5f, 1.0f, alpha);
+//    glColor4f(0.2f, 0.8f, 0.2f, alpha);
+    setGlColor(weight, alpha);
     glMap1d(GL_MAP1_VERTEX_3, 0.0, 1.0, 3, 4, &controlPoints[0][0]);
     glEnable(GL_MAP1_VERTEX_3);
-    glLineWidth((weight <= 10.0f) ? 1.0f : (weight * 0.1f));
+//    glLineWidth((weight <= 10.0f) ? 1.0f : (weight * 0.1f));
     glBegin(GL_LINE_STRIP);
     for (int i = 0; i <= 30; i++) {
         glEvalCoord1d((GLdouble) i / 30);
@@ -64,7 +70,7 @@ void drawBezier(const Point *start, const Point *ctrl1, const Point *ctrl2, cons
 }
 
 void init(char *pathIn) {
-    bundler = new EdgeBundler(pathIn, 50, 0.8f);
+    bundler = new EdgeBundler(pathIn, 5000, 0.8f);
     printf("Created Edge Bundler\n");
     bundler->doMingle();
     printf("Finished mingling");

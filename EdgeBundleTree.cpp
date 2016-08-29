@@ -107,7 +107,7 @@ void EdgeBundleTree::testBundle(EdgeBundleTree::BundleReturn *bundleReturn, cons
     bundleReturn->inkUsed = inkValueCombined;
 }
 
-void EdgeBundleTree::applyBundle(const EdgeBundleTree::BundleReturn& bundleReturn, EdgeBundleTree::Edge& edge1,
+int EdgeBundleTree::applyBundle(const EdgeBundleTree::BundleReturn& bundleReturn, EdgeBundleTree::Edge& edge1,
                                  EdgeBundleTree::Edge& edge2) {
     if (edge2.bundle->grouped) {
         // bundle2 should absorb bundle1
@@ -122,9 +122,11 @@ void EdgeBundleTree::applyBundle(const EdgeBundleTree::BundleReturn& bundleRetur
         bundle->weight += edge1.bundle->weight;
         bundle->ink = bundleReturn.inkUsed;
         setBundle(edge1, bundle);
+        return bundle->weight;
     } else {
         Edge *newBundle = new Edge(&edge1, &edge2, &bundleReturn);
         setBundle(*newBundle, newBundle);
+        return newBundle->weight;
     }
 }
 

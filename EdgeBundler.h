@@ -13,6 +13,7 @@ class EdgeBundler {
 public:
     double width, height;
     Point center;
+    int maxWeight = 0;
 
     EdgeBundler(const char *edgeFilename, unsigned int numNeighbors=10, float curviness=0.5f);
     void doMingle();
