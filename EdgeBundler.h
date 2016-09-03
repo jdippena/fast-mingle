@@ -14,37 +14,35 @@ public:
     double width, height;
     Point center;
 
-    EdgeBundler(const char *edgeFilename, unsigned int numNeighbors=10, float curviness=0.5f);
+    EdgeBundler(std::vector<EdgeNode> *edges, unsigned int numNeighbors=10, float curviness=0.5f);
     void doMingle();
-    void setDrawLineFunction(void (*drawLineFunction)(const Point *, const Point *, const int));
-    void setDrawBezierFunction(void (*drawBezierFunction)(const Point *start, const Point *ctrl1, const Point *ctrl2, const Point *end, const int weight));
-    void renderLines();
-    void renderBezier();
-    void write(char *path);
+    EdgeBundleTree &getTree() { return tree; }
 
 private:
     // Members needed for the ANN search
-    ANNpointArray   annPoints;
-    ANNkd_tree      annTree;
+    ANNpointArray annPoints = nullptr;
+    ANNkd_tree *annTree = nullptr;
 
-    EdgeBundleTree::Edge *edges;
-    unsigned int numEdges;
+
     unsigned int numNeighbors;
     float curviness;
-    EdgeBundleTree *tree;
-    void (*drawLine)(const Point *, const Point *, const int);
-    void (*drawBezier)(const Point *start, const Point *ctrl1, const Point *ctrl2, const Point *end, const int weight);
+
+    EdgeBundleTree tree;
+
+    std::vector<EdgeNode> *_edges;
+    std::vector<BaseNode *>rootNodes;
+
+    BaseNode *getRootNode(int i) {
+        return rootNodes.empty() ? ((BaseNode *)(&(*_edges)[i])) : rootNodes[i];
+    }
+    int getNumRootNodes() {
+        return (int) (rootNodes.empty() ? _edges->size() : rootNodes.size());
+    }
 
     void readEdgesFromFile(const char *edgeFilename);
-    void assignNeighbors();
-    void makeTopEdgesMap(std::unordered_map<int, EdgeBundleTree::Edge*> *map);
-    void drawEdgeLines(EdgeBundleTree::Edge *edge);
-    void drawEdgeBeziers(const EdgeBundleTree::Edge *edge, const Point *sPointTo, const Point *tPointTo);
+    void rebuildIndex();
 
-    void writeBundle(FILE *out, EdgeBundleTree::Edge *tree);
-    void writeEdgeBeziers(FILE *out, std::vector<const EdgeBundleTree::Edge *> *segments, const EdgeBundleTree::Edge *edge, const Point *sPointTo, const Point *tPointTo);
-    void writeOneEdgeBezier(FILE *out, const Point *start, Point *startCurve, const Point *ctrl1, const Point *ctrl2, const Point *end);
-
+    void findNeighbors(BaseNode *target, int n, std::vector<BaseNode *> neighbors);
 };
 
 #endif //MINGLEC_EDGEBUNDLER_H

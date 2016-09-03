@@ -1,360 +1,85 @@
 #include "EdgeBundler.h"
 
-EdgeBundler::EdgeBundler(const char *edgeFilename, unsigned int numNeighbors, float curviness)
-        : numNeighbors(numNeighbors), curviness(curviness / 2.0f) {
-    printf("Reading edges from file\n");
-    readEdgesFromFile(edgeFilename);
-    printf("Doing KNN\n");
-    assignNeighbors();
-}
+EdgeBundler::EdgeBundler(std::vector<EdgeNode> *edges, unsigned int numNeighbors, float curviness)
+        : _edges(edges), tree(edges), numNeighbors(numNeighbors), curviness(curviness / 2.0f) {
 
-void EdgeBundler::readEdgesFromFile(const char *edgeFilename) {
     double right = 0, top = 0, left = 0, bottom = 0;
-    FILE *fp;
-    fp = fopen(edgeFilename, "r");
-    assert(fp != NULL);
-    fscanf(fp, "%i", &numEdges);
-    //numEdges /= 10; // HACK FOR TESTING
-    numNeighbors = numEdges < numNeighbors ? numEdges : numNeighbors;
-    edges = (EdgeBundleTree::Edge*) malloc(sizeof(EdgeBundleTree::Edge) * numEdges);
-    std::unordered_map<Point, unsigned int, PointHasher> pointMap;
-    Point p1, p2;
-    unsigned int idx = 0;
-    for (int i = 0; i < numEdges; ++i) {
-        fscanf(fp, "%lf", &p1.x);
-        fscanf(fp, "%lf", &p1.y);
-        fscanf(fp, "%lf", &p2.x);
-        fscanf(fp, "%lf", &p2.y);
-        if (pointMap.find(p1) == pointMap.end()) pointMap[p1] = idx++;
-        if (pointMap.find(p2) == pointMap.end()) pointMap[p2] = idx++;
-    }
-
-    fseek(fp, 0, SEEK_SET);
-    fscanf(fp, "%i", &numEdges);
-    //numEdges /= 10; // HACK FOR TESTING
-    Point *newPoints = (Point*) malloc(sizeof(Point) * idx);
-    for (int i = 0; i < numEdges; ++i) {
-        fscanf(fp, "%lf", &p1.x);
-        fscanf(fp, "%lf", &p1.y);
-        fscanf(fp, "%lf", &p2.x);
-        fscanf(fp, "%lf", &p2.y);
-        if (p1.x > p2.x) {
-            Point temp = p1;
-            p1 = p2;
-            p2 = temp;
-        }
-
+    for (auto &e : *edges) {
+        Point &p1 = *e.getS();
+        Point &p2 = *e.getT();
         left = p1.x < left ? p1.x : left;
         right = p2.x > right ? p2.x : right;
         bottom = p1.y < bottom ? p1.y : bottom;
         bottom = p2.y < bottom ? p2.y : bottom;
         top = p1.y > top ? p1.y : top;
         top = p2.y > top ? p2.y : top;
-
-        unsigned int idx1 = pointMap[p1];
-        unsigned int idx2 = pointMap[p2];
-        newPoints[idx1] = p1;
-        newPoints[idx2] = p2;
-        Point *s = &newPoints[idx1];
-        Point *t = &newPoints[idx2];
-        edges[i] = EdgeBundleTree::Edge(s, t, &edges[i]);
     }
-    fclose(fp);
     width = right - left;
     height = top - bottom;
     center = {width / 2 + left, height / 2 + bottom};
 }
 
-void EdgeBundler::assignNeighbors() {
-    const int dim = 4;
-
-    ANNpoint queryPoint;
-    ANNpointArray points;
-    ANNidxArray indices;
-    ANNdistArray dists;
-    ANNkd_tree *kdTree;
-
-    queryPoint = annAllocPt(dim);
-    points = annAllocPts(numEdges, dim);
-    indices = new ANNidx[numNeighbors];
-    dists = new ANNdist[numNeighbors];
-
-    for (int i = 0; i < numEdges; ++i) {
-        ANNpoint p = points[i];
-        EdgeBundleTree::Edge& edge = edges[i];
-        p[0] = edge.sPoint->x;
-        p[1] = edge.sPoint->y;
-        p[2] = edge.tPoint->x;
-        p[3] = edge.tPoint->y;
+void EdgeBundler::rebuildIndex() {
+    if (annTree != nullptr) delete(annTree);
+    if (annPoints != nullptr)  annDeallocPts(annPoints);
+    annPoints = annAllocPts(getNumRootNodes(), 4);
+    assert(annPoints != nullptr);
+    for (int i = 0; i < getNumRootNodes(); ++i) {
+        BaseNode *edge = getRootNode(i);
+        ANNpoint p = annPoints[i];
+        p[0] = edge->getS()->x;
+        p[1] = edge->getS()->y;
+        p[2] = edge->getT()->x;
+        p[3] = edge->getT()->y;
     }
-    kdTree = new ANNkd_tree(points, numEdges, dim);
+    annTree = new ANNkd_tree(annPoints, getNumRootNodes(), 4);
+    assert(annTree != nullptr);
+}
 
-    EdgeBundleTree::Edge **neighbors = (EdgeBundleTree::Edge**) malloc(sizeof(EdgeBundleTree::Edge*) * numEdges * numNeighbors);
-    for (unsigned int i = 0; i < numEdges; ++i) {
-        EdgeBundleTree::Edge& edge = edges[i];
-        queryPoint[0] = edge.sPoint->x;
-        queryPoint[1] = edge.sPoint->y;
-        queryPoint[2] = edge.tPoint->x;
-        queryPoint[3] = edge.tPoint->y;
-        kdTree->annkSearch(queryPoint, numNeighbors, indices, dists);
-        for (int j = 0; j < numNeighbors; ++j) {
-            neighbors[i*numNeighbors + j] = &edges[indices[j]];
-        }
-        edge.neighbors = &neighbors[i*numNeighbors];
+void EdgeBundler::findNeighbors(BaseNode *target, int n, std::vector<BaseNode *>neighbors) {
+    // FIXME: Are these variable length arrays legal?
+    ANNidx indices[n];
+    ANNdist dists[n];
+    ANNcoord queryPoint[4];
+
+    queryPoint[0] = target->getS()->x;
+    queryPoint[1] = target->getS()->y;
+    queryPoint[2] = target->getT()->x;
+    queryPoint[3] = target->getT()->y;
+    annTree->annkSearch(queryPoint, n, indices, dists);
+    neighbors.resize(n);
+    for (int j = 0; j < n; ++j) {
+        neighbors[j] = &(*_edges)[indices[j]];
     }
-    tree = new EdgeBundleTree(edges, numEdges);
-    delete indices, dists, kdTree;
 }
 
 void EdgeBundler::doMingle() {
+    std::vector<BaseNode *> neighbors;
     int numBundled = 0;
-    EdgeBundleTree::BundleReturn bundleReturnArray[numNeighbors];
     int iter = 1;
+    rebuildIndex();
     do {
         numBundled = 0;
         printf("Iter: %d\n", iter++);
-        for (unsigned long i = 0; i < tree->numEdges; ++i) {
-            EdgeBundleTree::Edge& edge = tree->edges[i];
-            if (!edge.bundle->grouped) {
-                double maxInkSaved = -INFINITY;
-                int maxSavingNeighborIndex = 0;
-                for (int j = 0; j < numNeighbors; ++j) {
-                    EdgeBundleTree::Edge& neighbor = *edge.neighbors[j];
-                    if (edge.bundle == neighbor.bundle) continue;
-                    EdgeBundleTree::testBundle(&bundleReturnArray[j], *edge.bundle, *neighbor.bundle);
-                    EdgeBundleTree::BundleReturn& bundleReturn = bundleReturnArray[j];
-                    double inkSaved = edge.bundle->ink + neighbor.bundle->ink - bundleReturn.inkUsed;
+        for (auto &edge : *_edges) {
+            if (!edge.hasBundle()) {
+                findNeighbors(&edge, numNeighbors, neighbors);
+                double maxInkSaved = 0.0;
+                BaseNode *bestNeighbor = nullptr;
+                for (auto np : neighbors) {
+                    double inkSaved = edge.calculateBundleInkSavings(np);
                     if (inkSaved > maxInkSaved) {
                         maxInkSaved = inkSaved;
-                        maxSavingNeighborIndex = j;
+                        bestNeighbor = np;
                     }
                 }
-                if (maxInkSaved > 0) {
-                    EdgeBundleTree::applyBundle(bundleReturnArray[maxSavingNeighborIndex],
-                                                edge,
-                                                *edge.neighbors[maxSavingNeighborIndex]);
+                if (bestNeighbor != nullptr) {
+                    edge.bundleWith(bestNeighbor);
                     numBundled++;
                 }
             }
         }
-        printf("Bundled %d of %d\n", numBundled, tree->numEdges);
-        tree->coalesceTree();
+        printf("Bundled %d of %ld\n", numBundled, _edges->size());
     } while (numBundled > 0);
 }
 
-
-
-void EdgeBundler::makeTopEdgesMap(std::unordered_map<int, EdgeBundleTree::Edge *> *map) {
-    for (int i = 0; i < numEdges; ++i) {
-        (*map)[edges[i].bundle->id] = edges[i].bundle;
-    }
-}
-
-
-
-void EdgeBundler::setDrawLineFunction(void (*drawLineFunction)(const Point *, const Point *, const int)) {
-    drawLine = drawLineFunction;
-}
-
-void EdgeBundler::drawEdgeLines(EdgeBundleTree::Edge *edge) {
-    if (!edge->children) return;
-    for (EdgeBundleTree::Edge *child : *edge->children) {
-        drawEdgeLines(child);
-        drawLine(edge->sPoint, child->sPoint, child->weight);
-        drawLine(edge->tPoint, child->tPoint, child->weight);
-    }
-}
-
-void EdgeBundler::renderLines() {
-    std::unordered_map<int, EdgeBundleTree::Edge*> topEdgeMap;
-    makeTopEdgesMap(&topEdgeMap);
-    for (auto pair : topEdgeMap) {
-        EdgeBundleTree::Edge *bundle = pair.second;
-        drawEdgeLines(bundle);
-        drawLine(bundle->sPoint, bundle->tPoint, bundle->weight);
-    }
-}
-
-
-
-void EdgeBundler::write(char *path) {
-    FILE *out = fopen(path, "w");
-    if (out == nullptr) {
-        fprintf(stderr, "Open of %s failed\n", path);
-        exit(1);
-    }
-
-    std::unordered_map<int, EdgeBundleTree::Edge*> topEdgeMap;
-    makeTopEdgesMap(&topEdgeMap);
-    for (auto pair : topEdgeMap) {
-        writeBundle(out, pair.second);
-    }
-    fclose(out);
-}
-
-static void inline writeEnvelope(FILE *out, std::unordered_set<Point *> &points) {
-  double xMin = +INFINITY, xMax = -INFINITY,
-         yMin = +INFINITY, yMax = -INFINITY;
-
-   for (auto p : points) {
-       if (p->x < xMin) { xMin = p->x; }
-       if (p->y > yMax) { yMax = p->y; }
-       if (p->y < yMin) { yMin = p->y; }
-       if (p->x > xMax) { xMax = p->x; }
-   }
-
-    double d = 0.0001;
-    xMin -= d;
-    yMin -= d;
-    xMax += d;
-    yMax += d;
-    fprintf(out, "((%f %f, %f %f, %f %f, %f %f, %f %f))",
-            xMin, yMin, xMin, yMax, xMax, yMax, xMax, yMin, xMin, yMin);
-}
-
-void EdgeBundler::writeBundle(FILE *out, EdgeBundleTree::Edge *bundle) {
-
-    // Write out the beziers and flatten the tree into individual segments via a traversal
-    const Point sPointCurve = lerp(*bundle->sPoint, *bundle->tPoint, curviness);
-    const Point tPointCurve = lerp(*bundle->sPoint, *bundle->tPoint, 1 - curviness);
-    std::vector<const EdgeBundleTree::Edge *> segments;
-    fprintf(out, "MULTILINESTRING(");
-    writeEdgeBeziers(out, &segments, bundle, &sPointCurve, &tPointCurve);
-    fprintf(out, "(%f %f, %f %f))", sPointCurve.x, sPointCurve.y, tPointCurve.x, tPointCurve.y);
-    segments.push_back(bundle);
-
-    // Find all points and all weights
-    std::unordered_set<Point *> S;
-    std::unordered_set<Point *> T;
-    for (auto edge : segments) {
-        if (!edge->children) {
-            S.insert(edge->sPoint);
-            T.insert(edge->tPoint);
-        }
-    }
-
-    // Write weights
-    fprintf(out, "\t");
-    for (int i = 0; i < segments.size(); i++) {
-        if (i == 0) {
-            fprintf(out, "%d", segments[i]->weight);
-        } else {
-            fprintf(out, " %d", segments[i]->weight);
-        }
-    }
-
-    // Write size
-    fprintf(out, "\t%ld", S.size()+T.size());
-
-    // Write envelopes for endpoints as a multipolygon
-    fprintf(out, "\tMULTIPOLYGON(");
-    writeEnvelope(out, S);
-    fprintf(out, ", ");
-    writeEnvelope(out, T);
-    fprintf(out, ")\n");
-}
-
-void EdgeBundler::writeEdgeBeziers(FILE *out, std::vector<const EdgeBundleTree::Edge *> *segments, const EdgeBundleTree::Edge *edge, const Point *sPointTo, const Point *tPointTo) {
-    if (!edge->children) return;
-    for (EdgeBundleTree::Edge *child : *edge->children) {
-        const Point sChildPointTo = lerp(*child->sPoint, *edge->sPoint, curviness);
-        const Point tChildPointTo = lerp(*child->tPoint, *edge->tPoint, curviness);
-        const Point *sStart;
-        const Point *tStart;
-        writeEdgeBeziers(out, segments, child, &sChildPointTo, &tChildPointTo);
-        Point sPointFrom, tPointFrom;
-        if (!child->children) {
-            sPointFrom = *child->sPoint;
-            tPointFrom = *child->tPoint;
-            sStart = &sPointFrom;
-            tStart = &tPointFrom;
-        } else {
-            sPointFrom = lerp(*child->sPoint, *edge->sPoint, 1 - curviness);
-            tPointFrom = lerp(*child->tPoint, *edge->tPoint, 1 - curviness);
-            sStart = &sChildPointTo;
-            tStart = &tChildPointTo;
-        }
-        segments->push_back(child);
-        writeOneEdgeBezier(out, sStart, &sPointFrom, edge->sPoint, edge->sPoint, sPointTo);
-        segments->push_back(child);
-        writeOneEdgeBezier(out, tStart, &tPointFrom, edge->tPoint, edge->tPoint, tPointTo);
-    }
-}
-
-void EdgeBundler::writeOneEdgeBezier(FILE *out, const Point *start, Point *startCurve, const Point *ctrl1, const Point *ctrl2, const Point *end) {
-    double p[4][2] = {{startCurve->x, startCurve->y},
-                      {ctrl1->x, ctrl1->y},
-                      {ctrl2->x, ctrl2->y},
-                      {end->x, end->y}};
-
-    // This code is from http://stackoverflow.com/a/11435243/141245
-
-    //the amount of steps in the bezier curve
-    unsigned int steps=10;
-    double X[steps+2];
-    double Y[steps+2];
-
-    X[0] = start->x;
-    Y[0] = start->y;
-
-    for(int i = 0 ; i < steps ; i ++) {
-        double f = 1.0 * i / steps;     // fraction we have traveled (between [0 and 1])
-        double mf = 1.0 - f;            // one minus f (between [1 and 0])
-        double x = mf * mf * mf * p[0][0] + 3 * mf * mf * f * p[1][0] + 3 * mf * f * f * p[2][0] + f * f * f * p[3][0];
-        double y = mf * mf * mf * p[0][1] + 3 * mf * mf * f * p[1][1] + 3 * mf * f * f * p[2][1] + f * f * f * p[3][1];
-        X[i+1] = x;
-        Y[i+1] = y;
-    }
-
-    X[steps+1] = end->x;
-    Y[steps+1] = end->y;
-
-    fprintf(out, "(");
-    for (int i = 0; i <= steps; i++) {
-        if (i > 0) {
-            fprintf(out, ", %f %f", X[i], Y[i]);
-        } else {
-            fprintf(out, "%f %f", X[i], Y[i]);
-        }
-    }
-    fprintf(out, "), ");
-}
-
-void EdgeBundler::setDrawBezierFunction(void (*drawBezierFunction)(const Point *start, const Point *ctrl1, const Point *ctrl2, const Point *end, const int weight)) {
-    drawBezier = drawBezierFunction;
-}
-
-void EdgeBundler::drawEdgeBeziers(const EdgeBundleTree::Edge *edge, const Point *sPointTo, const Point *tPointTo) {
-    if (!edge->children) return;
-    for (EdgeBundleTree::Edge *child : *edge->children) {
-        const Point sChildPointTo = lerp(*child->sPoint, *edge->sPoint, curviness);
-        const Point tChildPointTo = lerp(*child->tPoint, *edge->tPoint, curviness);
-        drawEdgeBeziers(child, &sChildPointTo, &tChildPointTo);
-        Point sPointFrom, tPointFrom;
-        if (!child->children) {
-            sPointFrom = *child->sPoint;
-            tPointFrom = *child->tPoint;
-        } else {
-            sPointFrom = lerp(*child->sPoint, *edge->sPoint, 1 - curviness);
-            tPointFrom = lerp(*child->tPoint, *edge->tPoint, 1 - curviness);
-            drawLine(&sChildPointTo, &sPointFrom, child->weight);
-            drawLine(&tChildPointTo, &tPointFrom, child->weight);
-        }
-        drawBezier(&sPointFrom, edge->sPoint, edge->sPoint, sPointTo, child->weight);
-        drawBezier(&tPointFrom, edge->tPoint, edge->tPoint, tPointTo, child->weight);
-    }
-}
-
-
-
-void EdgeBundler::renderBezier() {
-    std::unordered_map<int, EdgeBundleTree::Edge*> topEdgeMap;
-    makeTopEdgesMap(&topEdgeMap);
-    for (auto pair : topEdgeMap) {
-        EdgeBundleTree::Edge *bundle = pair.second;
-        const Point sPointCurve = lerp(*bundle->sPoint, *bundle->tPoint, curviness);
-        const Point tPointCurve = lerp(*bundle->sPoint, *bundle->tPoint, 1 - curviness);
-        drawEdgeBeziers(bundle, &sPointCurve, &tPointCurve);
-        drawLine(&sPointCurve, &tPointCurve, bundle->weight);
-    }
-}

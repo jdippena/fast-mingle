@@ -1,4 +1,5 @@
 #include "main.h"
+#include "EdgeBundleTree.h"
 
 using namespace std;
 
@@ -44,15 +45,11 @@ void drawBezier(const Point *start, const Point *ctrl1, const Point *ctrl2, cons
     glEnd();
 }
 
-void init(char *pathIn) {
-    bundler = new EdgeBundler(pathIn, 50, 0.8f);
+void init(std::vector<EdgeNode> &edges) {
+    bundler = new EdgeBundler(&edges, 50, 0.8f);
     printf("Created Edge Bundler\n");
     bundler->doMingle();
     printf("Finished mingling");
-    if (shouldRender()) {
-        bundler->setDrawLineFunction(drawLine);
-        bundler->setDrawBezierFunction(drawBezier);
-    }
 }
 
 void reshape(int w, int h) {
@@ -73,7 +70,13 @@ void renderBundler() {
     glClear(GL_COLOR_BUFFER_BIT);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    bundler->renderBezier();
+    EdgeBundleIterator *iter = bundler->getTree().iterator();
+    while (true) {
+        BaseNode *n = iter->next();
+        if (n == nullptr) break;
+        drawLine(n->getS(), n->getT(), 1);
+    }
+    delete iter;
     glFlush();
 }
 
@@ -82,7 +85,9 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "usage: %s path_edges.txt path_output.txt\n", *argv);
         return 1;
     }
-    init(argv[1]);
+    std::vector<EdgeNode> edges;
+    BaseNode::ReadEdges(argv[1], edges);
+    init(edges);
 
     if (shouldRender()) {
         glutInit(&argc, argv);
@@ -93,10 +98,6 @@ int main(int argc, char *argv[]) {
         glutReshapeFunc(reshape);
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
         glutMainLoop();
-    }
-
-    if (argc >= 3) {
-        bundler->write(argv[2]);
     }
 
     return 0;

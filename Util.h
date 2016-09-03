@@ -10,8 +10,11 @@ static const double PHI = (1 + sqrt(5)) / 2;
 static const int UNGROUPED = -1;
 
 struct Point {
-    double x, y;
+    float x = 0, y = 0;
 
+    Point(double x2, double y2) : x((float) x2), y((float) y2) {}
+    Point(float x2, float y2) : x(x2), y(y2) {}
+    Point() : x(0.0f), y(0.0f) {}
     Point operator+ (Point& p);
     Point operator- (Point& p);
     Point operator* (int k);

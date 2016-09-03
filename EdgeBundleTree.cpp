@@ -1,147 +1,145 @@
+#include <unordered_map>
 #include "EdgeBundleTree.h"
 
-int edgeId = 0;
-
-EdgeBundleTree::Edge::Edge(Point *s, Point *t, Edge *bundle) {
-    assert(s->x <= t->x);
-    sPoint = s;
-    tPoint = t;
-    sCentroid = s;
-    tCentroid = t;
-    this->bundle = bundle;
-    S->insert(s);
-    T->insert(t);
-
-    children = nullptr;
-    ink = sqrt(t->sqDist(*s));
-    weight = 1;
-    grouped = false;
-    id = edgeId++;
+double BaseNode::calculateBundleInkSavings(BaseNode *other) {
+  double newInk = calculateBundle(other, nullptr, nullptr, nullptr, nullptr);
+  return getInk() + other->getInk() - newInk;
 }
 
-EdgeBundleTree::Edge::Edge(Edge *child1, Edge *child2, const BundleReturn *data) {
-    Point *points = (Point*) malloc(sizeof(Point) * 4);
-    points[0] = data->s;
-    points[1] = data->t;
-    points[2] = data->sCentroid;
-    points[3] = data->tCentroid;
-    if (points[0].x > points[1].x) {
-        Point temp = points[0];
-        points[0] = points[1];
-        points[1] = temp;
-        temp = points[2];
-        points[2] = points[3];
-        points[3] = temp;
-    }
-    sPoint = &points[0];
-    tPoint = &points[1];
-    sCentroid = &points[2];
-    tCentroid = &points[3];
-    bundle = this;
-    S->insert(child1->sPoint);
-    S->insert(child2->sPoint);
-    T->insert(child1->tPoint);
-    T->insert(child2->tPoint);
+double BaseNode::calculateBundle(BaseNode *other,
+                                 Point *sp, Point *tp,
+                                 Point *sCentroidp, Point *tCentroidp) {
 
-    children = new std::vector<Edge*>();
-    children->push_back(child1);
-    children->push_back(child2);
-    neighbors = nullptr;
-    ink = data->inkUsed;
-    weight = child1->weight + child2->weight;
-    grouped = true;
-    id = edgeId++;
-}
+    int combinedWeight = getWeight() + other->getWeight();
+    Point sCentroid = {
+            (getSCentroid()->x * getWeight() + other->getSCentroid()->x * getWeight()) / combinedWeight,
+            (getSCentroid()->y * getWeight() + other->getSCentroid()->y * getWeight()) / combinedWeight
+    };
+    Point tCentroid = {
+            (getTCentroid()->x * getWeight() + other->getTCentroid()->x * getWeight()) / combinedWeight,
+            (getTCentroid()->y * getWeight() + other->getTCentroid()->y * getWeight()) / combinedWeight
+    };
 
-EdgeBundleTree::EdgeBundleTree(EdgeBundleTree::Edge *edges, unsigned int numEdges)
-        : edges(edges), numEdges(numEdges) {}
-
-void EdgeBundleTree::testBundle(EdgeBundleTree::BundleReturn *bundleReturn, const Edge& bundle1, const Edge& bundle2) {
-    int combinedWeight = bundle1.weight + bundle2.weight;
-    bundleReturn->sCentroid = {(bundle1.sCentroid->x * bundle1.weight + bundle2.sCentroid->x * bundle2.weight) / combinedWeight,
-                       (bundle1.sCentroid->y * bundle1.weight + bundle2.sCentroid->y * bundle2.weight) / combinedWeight};
-    bundleReturn->tCentroid = {(bundle1.tCentroid->x * bundle1.weight + bundle2.tCentroid->x * bundle2.weight) / combinedWeight,
-                       (bundle1.tCentroid->y * bundle1.weight + bundle2.tCentroid->y * bundle2.weight) / combinedWeight};
-    Point& sCentroid = bundleReturn->sCentroid;
-    Point& tCentroid = bundleReturn->tCentroid;
     Point u = tCentroid - sCentroid;
     u = u / u.norm();
     double dist, distSum = 0, maxDist = 0;
     int k = 0;
-    std::unordered_set<Point*> combinedS, combinedT;
-    combinedS.insert(bundle1.S->begin(), bundle1.S->end());
-    combinedS.insert(bundle2.S->begin(), bundle2.S->end());
-    combinedT.insert(bundle1.T->begin(), bundle1.T->end());
-    combinedT.insert(bundle2.T->begin(), bundle2.T->end());
-    for (auto point_ptr : combinedS) {
-        Point v = *point_ptr - sCentroid;
-        dist = u * v;
-        maxDist = maxDist < dist ? dist : maxDist;
-        distSum += dist;
-        k += 1;
+    for (auto n : {this, other}) {
+      for (auto child : *n->getChildren()) {
+          Point v = *child->getS() - sCentroid;
+          dist = u * v;
+          maxDist = maxDist < dist ? dist : maxDist;
+          distSum += dist;
+          k += 1;
+      }
     }
-    for (auto point_ptr : combinedT) {
-        Point v = *point_ptr - tCentroid;
-        dist = -(u * v);
-        maxDist = maxDist < dist ? dist : maxDist;
-        distSum += dist;
-        k += 1;
+     for (auto n : {this, other}) {
+      for (auto child : *n->getChildren()) {
+          Point v = *child->getT() - tCentroid;
+          dist = -(u * v);
+          maxDist = maxDist < dist ? dist : maxDist;
+          distSum += dist;
+          k += 1;
+      }
     }
+
     Point delta = tCentroid - sCentroid;
     double d = delta.norm();
     double x = ((distSum + 2 * d) / (k + 4) / d);
-    bundleReturn->s = lerp(sCentroid, tCentroid, x);
-    bundleReturn->t = lerp(sCentroid, tCentroid, 1 - x);
-    Point& sPoint = bundleReturn->s;
-    Point& tPoint = bundleReturn->t;
+    Point sPoint = lerp(sCentroid, tCentroid, x);
+    Point tPoint = lerp(sCentroid, tCentroid, 1 - x);
     delta = tPoint - sPoint;
     double inkValueCombined = delta.norm();
-    for (auto point_ptr : combinedS) {
-        delta = *point_ptr - sPoint;
-        inkValueCombined += delta.norm();
+    for (auto n : {this, other}) {
+        for (auto child : *n->getChildren()) {
+            delta = *child->getS() - sPoint;
+            inkValueCombined += delta.norm();
+        }
     }
-    for (auto point_ptr : combinedT) {
-        delta = *point_ptr - tPoint;
-        inkValueCombined += delta.norm();
+    for (auto n : {this, other}) {
+        for (auto child : *n->getChildren()) {
+            delta = *child->getT() - tPoint;
+            inkValueCombined += delta.norm();
+        }
     }
-    bundleReturn->inkUsed = inkValueCombined;
+    if (sp != nullptr) *sp = sPoint;
+    if (tp != nullptr) *tp = tPoint;
+    if (sCentroidp != nullptr) *sCentroidp = sCentroid;
+    if (tCentroidp != nullptr) *tCentroidp = tCentroid;
+    return inkValueCombined;
 }
 
-void EdgeBundleTree::applyBundle(const EdgeBundleTree::BundleReturn& bundleReturn, EdgeBundleTree::Edge& edge1,
-                                 EdgeBundleTree::Edge& edge2) {
-    if (edge2.bundle->grouped) {
-        // bundle2 should absorb bundle1
-        Edge *bundle = edge2.bundle;
-        *bundle->sPoint = bundleReturn.s;
-        *bundle->tPoint = bundleReturn.t;
-        bundle->S->insert(edge1.bundle->sPoint);
-        bundle->T->insert(edge1.bundle->tPoint);
-        *bundle->sCentroid = bundleReturn.sCentroid;
-        *bundle->tCentroid = bundleReturn.tCentroid;
-        bundle->children->push_back(edge1.bundle);
-        bundle->weight += edge1.bundle->weight;
-        bundle->ink = bundleReturn.inkUsed;
-        setBundle(edge1, bundle);
-    } else {
-        Edge *newBundle = new Edge(&edge1, &edge2, &bundleReturn);
-        setBundle(*newBundle, newBundle);
-    }
+BundleNode::BundleNode(EdgeNode *e1, EdgeNode *e2) {
+    _ink = e1->calculateBundle(e2, &_s, &_t, &_sCentroid, &_tCentroid);
+    e1->_b = this;
+    _weight = 2;
+    _children.push_back(e1);
+    _children.push_back(e2);
 }
 
-void EdgeBundleTree::setBundle(EdgeBundleTree::Edge& edge, EdgeBundleTree::Edge *bundle) {
-    edge.bundle = bundle;
-    if (!edge.children) return;
-    for (auto child_ptr : *edge.children) {
-        setBundle(*child_ptr, bundle);
+BundleNode *BundleNode::bundleWith(BaseNode *other) {
+    _ink = calculateBundle(other, &_s, &_t, &_sCentroid, &_tCentroid);
+    _children.insert(_children.end(), other->getChildren()->begin(), other->getChildren()->end());
+    _weight += other->getWeight();
+    for (auto c: *other->getChildren()) {
+        _children.push_back(c);
+        ((EdgeNode *)c)->_b = this;
     }
+    return this;
 }
 
-void EdgeBundleTree::coalesceTree() {
-    // TODO: make a top edges set so that testing bundles can be faster (i.e., loop through top bundles, not inidivudal edges)
-    for (int i = 0; i < numEdges; ++i) {
-        Edge& edge = edges[i];
-        edge.grouped = false;
-        edge.ink = sqrt(edge.tPoint->sqDist(*edge.sPoint));
-    }
+BundleNode *EdgeNode::bundleWith(BaseNode *other) {
+  if (other->isBundle()) {
+      return other->bundleWith(this);   // Merge into other bundle if possible
+  } else {
+      return new BundleNode(this, (EdgeNode *)other);
+  }
 }
 
+void BaseNode::ReadEdges(const char *path, std::vector<EdgeNode> &edges) {
+      FILE *fp;
+      fp = fopen(path, "r");
+      assert(fp != NULL);
+      int numEdges;
+      fscanf(fp, "%i", &numEdges);
+      //numEdges /= 10; // HACK FOR TESTING
+      std::unordered_map<Point, unsigned int, PointHasher> pointMap;
+      Point p1, p2;
+      unsigned int idx = 0;
+      for (int i = 0; i < numEdges; ++i) {
+          fscanf(fp, "%f", &p1.x);
+          fscanf(fp, "%f", &p1.y);
+          fscanf(fp, "%f", &p2.x);
+          fscanf(fp, "%f", &p2.y);
+          if (pointMap.find(p1) == pointMap.end()) pointMap[p1] = idx++;
+          if (pointMap.find(p2) == pointMap.end()) pointMap[p2] = idx++;
+      }
+
+      edges.reserve(numEdges);
+      fseek(fp, 0, SEEK_SET);
+      fscanf(fp, "%i", &numEdges);
+      //numEdges /= 10; // HACK FOR TESTING
+      Point *newPoints = (Point*) malloc(sizeof(Point) * idx);
+      for (int i = 0; i < numEdges; ++i) {
+          fscanf(fp, "%f", &p1.x);
+          fscanf(fp, "%f", &p1.y);
+          fscanf(fp, "%f", &p2.x);
+          fscanf(fp, "%f", &p2.y);
+
+          // Since we treat this as a weighted graph
+          /*if (p1.x > p2.x) {
+              Point temp = p1;
+              p1 = p2;
+              p2 = temp;
+          }*/
+
+          unsigned int idx1 = pointMap[p1];
+          unsigned int idx2 = pointMap[p2];
+          newPoints[idx1] = p1;
+          newPoints[idx2] = p2;
+          Point *s = &newPoints[idx1];
+          Point *t = &newPoints[idx2];
+          edges.emplace_back(s, t);
+      }
+      fclose(fp);
+}
