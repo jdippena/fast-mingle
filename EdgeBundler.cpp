@@ -1,22 +1,7 @@
 #include "EdgeBundler.h"
 
-EdgeBundler::EdgeBundler(std::vector<EdgeNode> *edges, unsigned int numNeighbors, float curviness)
-        : _edges(edges), tree(edges), numNeighbors(numNeighbors), curviness(curviness / 2.0f) {
-
-    double right = 0, top = 0, left = 0, bottom = 0;
-    for (auto &e : *edges) {
-        Point &p1 = *e.getS();
-        Point &p2 = *e.getT();
-        left = p1.x < left ? p1.x : left;
-        right = p2.x > right ? p2.x : right;
-        bottom = p1.y < bottom ? p1.y : bottom;
-        bottom = p2.y < bottom ? p2.y : bottom;
-        top = p1.y > top ? p1.y : top;
-        top = p2.y > top ? p2.y : top;
-    }
-    width = right - left;
-    height = top - bottom;
-    center = {width / 2 + left, height / 2 + bottom};
+EdgeBundler::EdgeBundler(std::vector<Point> *points, std::vector<EdgeNode> *edges, unsigned int numNeighbors, float curviness)
+        : _edges(edges), tree(points, edges), numNeighbors(numNeighbors), curviness(curviness / 2.0f) {
 }
 
 void EdgeBundler::rebuildIndex() {
@@ -36,7 +21,7 @@ void EdgeBundler::rebuildIndex() {
     assert(annTree != nullptr);
 }
 
-void EdgeBundler::findNeighbors(BaseNode *target, int n, std::vector<BaseNode *>neighbors) {
+void EdgeBundler::findNeighbors(BaseNode *target, int n, std::vector<BaseNode *>&neighbors) {
     // FIXME: Are these variable length arrays legal?
     ANNidx indices[n];
     ANNdist dists[n];
@@ -75,6 +60,9 @@ void EdgeBundler::doMingle() {
                 }
                 if (bestNeighbor != nullptr) {
                     edge.bundleWith(bestNeighbor);
+                    printf("bundling %u %u and %u %u\n",
+                           edge.getS()->id, edge.getT()->id,
+                           bestNeighbor->getS()->id, bestNeighbor->getT()->id);
                     numBundled++;
                 }
             }

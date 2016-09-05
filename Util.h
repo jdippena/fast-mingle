@@ -9,12 +9,21 @@
 static const double PHI = (1 + sqrt(5)) / 2;
 static const int UNGROUPED = -1;
 
+
+#define POINT_ID_NONE    0
+
+
+typedef uint32_t PointId;
+
+static PointId numPoints = 0;
+
 struct Point {
     float x = 0, y = 0;
+    PointId id;
 
-    Point(double x2, double y2) : x((float) x2), y((float) y2) {}
-    Point(float x2, float y2) : x(x2), y(y2) {}
-    Point() : x(0.0f), y(0.0f) {}
+    Point(double x2, double y2) : x((float) x2), y((float) y2), id(++numPoints) {}
+    Point(float x2, float y2) : x(x2), y(y2), id(++numPoints) {}
+    Point() : x(0.0f), y(0.0f), id(POINT_ID_NONE) {}
     Point operator+ (Point& p);
     Point operator- (Point& p);
     Point operator* (int k);

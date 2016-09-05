@@ -11,10 +11,7 @@
 
 class EdgeBundler {
 public:
-    double width, height;
-    Point center;
-
-    EdgeBundler(std::vector<EdgeNode> *edges, unsigned int numNeighbors=10, float curviness=0.5f);
+    EdgeBundler(std::vector<Point> *points, std::vector<EdgeNode> *edges, unsigned int numNeighbors=10, float curviness=0.5f);
     void doMingle();
     EdgeBundleTree &getTree() { return tree; }
 
@@ -39,10 +36,9 @@ private:
         return (int) (rootNodes.empty() ? _edges->size() : rootNodes.size());
     }
 
-    void readEdgesFromFile(const char *edgeFilename);
     void rebuildIndex();
 
-    void findNeighbors(BaseNode *target, int n, std::vector<BaseNode *> neighbors);
+    void findNeighbors(BaseNode *target, int n, std::vector<BaseNode *> &neighbors);
 };
 
 #endif //MINGLEC_EDGEBUNDLER_H
